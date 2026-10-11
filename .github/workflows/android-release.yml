@@ -70,6 +70,11 @@ jobs:
           npx cap sync android
           chmod +x android/gradlew
           cd android
+          echo "=== GENERATED ANDROID APP GRADLE ==="
+          nl -ba app/build.gradle | sed -n '1,45p'
+          echo "=== GENERATED VARIABLES ==="
+          nl -ba variables.gradle | sed -n '1,35p'
+          echo "=== GRADLE BUILD ==="
           ./gradlew --no-daemon --stacktrace assembleRelease
 
       - name: Verify APK artifact
