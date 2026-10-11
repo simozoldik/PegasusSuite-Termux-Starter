@@ -11,6 +11,7 @@ permissions:
 jobs:
   build-android:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v5
@@ -44,13 +45,55 @@ jobs:
           npm run build
           npm run test:web
 
+      - name: Prepare Android signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          test -n "$KEYSTORE_BASE64"
+          test -n "$STORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+
+          mkdir -p "$RUNNER_TEMP/pegasus-signing"
+
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pegasus-signing/release.p12"
+          chmod 600 "$RUNNER_TEMP/pegasus-signing/release.p12"
+
+          keytool -importkeystore \
+            -srckeystore "$RUNNER_TEMP/pegasus-signing/release.p12" \
+            -srcstoretype PKCS12 \
+            -srcstorepass "$STORE_PASSWORD" \
+            -destkeystore "$RUNNER_TEMP/pegasus-signing/release.jks" \
+            -deststoretype JKS \
+            -deststorepass "$STORE_PASSWORD" \
+            -srcalias "$KEY_ALIAS" \
+            -destalias "$KEY_ALIAS" \
+            -srckeypass "$KEY_PASSWORD" \
+            -destkeypass "$KEY_PASSWORD" \
+            -noprompt
+
+          keytool -list \
+            -keystore "$RUNNER_TEMP/pegasus-signing/release.jks" \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS"
+
       - name: Recreate Capacitor Android scaffold
         env:
           PEGASUS_VERSION_CODE: ${{ github.run_number }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+
           BACKUP="$RUNNER_TEMP/pegasus-gradle-template"
           mkdir -p "$BACKUP/app"
+
           cp android/build.gradle "$BACKUP/build.gradle"
           cp android/variables.gradle "$BACKUP/variables.gradle"
           cp android/gradle.properties "$BACKUP/gradle.properties"
@@ -68,19 +111,35 @@ jobs:
 
           node scripts/prepare-android-ci.mjs
           npx cap sync android
+
           chmod +x android/gradlew
           cd android
+
           echo "=== GENERATED ANDROID APP GRADLE ==="
           nl -ba app/build.gradle | sed -n '1,45p'
+
           echo "=== GENERATED VARIABLES ==="
           nl -ba variables.gradle | sed -n '1,35p'
+
           echo "=== GRADLE BUILD ==="
+          PEGASUS_KEYSTORE_FILE="$RUNNER_TEMP/pegasus-signing/release.jks" \
+          PEGASUS_KEYSTORE_PASSWORD="$STORE_PASSWORD" \
+          PEGASUS_KEY_ALIAS="$KEY_ALIAS" \
+          PEGASUS_KEY_PASSWORD="$KEY_PASSWORD" \
           ./gradlew --no-daemon --stacktrace assembleRelease
 
-      - name: Verify APK artifact
+      - name: Verify signed APK
         run: |
           set -euo pipefail
-          test -s android/app/build/outputs/apk/release/Pegasus-Suite-release.apk
+
+          APK="android/app/build/outputs/apk/release/Pegasus-Suite-release.apk"
+
+          test -s "$APK"
+
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify \
+            --verbose \
+            --print-certs \
+            "$APK"
 
       - name: Upload release APK
         uses: actions/upload-artifact@v4
