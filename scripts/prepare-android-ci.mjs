@@ -58,12 +58,12 @@ fs.writeFileSync(manifestPath, manifest);
 
 const gradlePath = path.join(android, 'app/build.gradle');
 let gradle = fs.readFileSync(gradlePath, 'utf8');
-if (/versionCode\s+1\b/.test(gradle)) {
-  gradle = gradle.replace(/versionCode\s+1\b/, "versionCode (System.getenv('PEGASUS_VERSION_CODE') ?: '1').toInteger()");
-} else if (!/PEGASUS_VERSION_CODE/.test(gradle)) {
-  throw new Error('Could not safely patch versionCode in generated app/build.gradle');
+const versionCode = Number.parseInt(process.env.PEGASUS_VERSION_CODE || '1', 10);
+if (!Number.isSafeInteger(versionCode) || versionCode < 1) {
+  throw new Error('PEGASUS_VERSION_CODE must be a positive integer');
 }
-gradle = gradle.replace(/versionName\s+["']1\.0\.0["']/, 'versionName "1.0.${System.getenv(\'PEGASUS_VERSION_CODE\') ?: \'1\'}"');
+gradle = gradle.replace(/^[ \\t]*versionCode[ \\t]+.*$/m, `        versionCode ${versionCode}`);
+gradle = gradle.replace(/^[ \\t]*versionName[ \\t]+.*$/m, `        versionName "1.0.${versionCode}"`);
 fs.writeFileSync(gradlePath, gradle);
 
 console.log('Prepared Android project with recovered Pegasus native plugins, permissions, network policy, and CI versioning.');
