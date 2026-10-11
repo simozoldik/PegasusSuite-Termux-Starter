@@ -64,21 +64,9 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pegasus-signing/release.p12"
           chmod 600 "$RUNNER_TEMP/pegasus-signing/release.p12"
 
-          keytool -importkeystore \
-            -srckeystore "$RUNNER_TEMP/pegasus-signing/release.p12" \
-            -srcstoretype PKCS12 \
-            -srcstorepass "$STORE_PASSWORD" \
-            -destkeystore "$RUNNER_TEMP/pegasus-signing/release.jks" \
-            -deststoretype JKS \
-            -deststorepass "$STORE_PASSWORD" \
-            -srcalias "$KEY_ALIAS" \
-            -destalias "$KEY_ALIAS" \
-            -srckeypass "$KEY_PASSWORD" \
-            -destkeypass "$KEY_PASSWORD" \
-            -noprompt
-
           keytool -list \
-            -keystore "$RUNNER_TEMP/pegasus-signing/release.jks" \
+            -storetype PKCS12 \
+            -keystore "$RUNNER_TEMP/pegasus-signing/release.p12" \
             -storepass "$STORE_PASSWORD" \
             -alias "$KEY_ALIAS"
 
@@ -122,7 +110,7 @@ jobs:
           nl -ba variables.gradle | sed -n '1,35p'
 
           echo "=== GRADLE BUILD ==="
-          PEGASUS_KEYSTORE_FILE="$RUNNER_TEMP/pegasus-signing/release.jks" \
+          PEGASUS_KEYSTORE_FILE="$RUNNER_TEMP/pegasus-signing/release.p12" \
           PEGASUS_KEYSTORE_PASSWORD="$STORE_PASSWORD" \
           PEGASUS_KEY_ALIAS="$KEY_ALIAS" \
           PEGASUS_KEY_PASSWORD="$KEY_PASSWORD" \
