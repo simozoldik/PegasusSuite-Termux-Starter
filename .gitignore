@@ -1,0 +1,31 @@
+node_modules/
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+android/keystore/
+android/keystore.properties
+dist/
+dist/*.apk
+dist/*.aab
+.tooling/node-v24*-win-x64/
+.tooling/node-*.zip
+npm-debug.log*
+
+# Generated web and Android build outputs
+www/
+android/.gradle/
+android/build/
+android/app/build/
+android/capacitor-cordova-android-plugins/build/
+*.apk
+*.aab
+
+# Additional secrets and signing material
+.env.*
+!.env.example
+*.jks
+*.keystore
+keystore.properties
+local.properties

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pegasus — INTERNAL TEST (release) network security.
+
+  ROOT-CAUSE NOTE (2026-10-05): the previous revision whitelisted only the STALE
+  LAN host 192.168.1.85, while the app's config.js points at the CURRENT host
+  192.168.1.137. Android therefore blocked the WebView's cleartext HTTP request
+  at the OS layer -> "TypeError: Failed to fetch". allowMixedContent=true in
+  capacitor.config.json does NOT override this OS-level policy.
+
+  Because this internal test host is on DHCP and its LAN IP can change
+  (85 -> 137 already observed), cleartext HTTP is permitted for the whole
+  internal-test build so the app keeps working regardless of the host IP.
+
+  *** TEST ONLY. MUST be reverted to cleartextTrafficPermitted="false" (and the
+      app repointed at the real HTTPS endpoint) before any production release. ***
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Explicitly listed internal-test backends (kept for documentation). -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.1.137</domain>
+        <domain includeSubdomains="false">192.168.1.85</domain>
+        <domain includeSubdomains="false">10.27.1.18</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

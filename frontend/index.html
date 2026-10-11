@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#05070f" />
+  <title>Pegasus Suite</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-text">PEGASUS <b>SUITE</b></span>
+    </div>
+    <span class="grow"></span>
+    <button id="btn-conn" class="conn" type="button" title="Backend connection">
+      <span id="conn-dot" class="dot"></span>
+      <span id="conn-label">checking…</span>
+    </button>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Scan modules">
+    <button class="tab active" role="tab" data-tab="recon" type="button">RECON</button>
+    <button class="tab" role="tab" data-tab="cameras" type="button">CAMERAS</button>
+    <button class="tab" role="tab" data-tab="wifi" type="button">WI-FI</button>
+    <button class="tab" role="tab" data-tab="phones" type="button">PHONES</button>
+  </nav>
+
+  <main class="app">
+    <section class="stage">
+      <canvas id="radar" class="radar" width="600" height="600"></canvas>
+      <div class="stage-overlay">
+        <span id="scan-state" class="scan-state idle">IDLE</span>
+        <span id="scan-count" class="scan-count">0 found</span>
+      </div>
+    </section>
+
+    <section class="controls">
+      <label id="target-label" class="target-label" for="target">Target subnet (CIDR)</label>
+      <div class="row">
+        <input id="target" class="target" type="text" inputmode="text" spellcheck="false"
+               autocapitalize="none" autocomplete="off" placeholder="192.168.1.0/24" />
+        <button id="btn-scan" class="btn primary" type="button">START SCAN</button>
+      </div>
+      <div class="row">
+        <button id="btn-stop" class="btn ghost" type="button" disabled>STOP</button>
+        <button id="btn-clear" class="btn ghost" type="button">CLEAR</button>
+        <span id="hint" class="hint"></span>
+      </div>
+    </section>
+
+    <section class="module" id="module-desc">
+      <p id="module-text" class="module-text"></p>
+    </section>
+
+    <section class="results-wrap">
+      <ul id="results" class="results"></ul>
+      <pre id="detail" class="detail hidden"></pre>
+    </section>
+
+    <section class="settings">
+      <details>
+        <summary>Connection &amp; settings</summary>
+        <label for="api-base">Backend base URL</label>
+        <input id="api-base" class="target" type="text" inputmode="url" spellcheck="false"
+               autocapitalize="none" autocomplete="off" placeholder="http://192.168.1.137:8710" />
+        <div class="row">
+          <button id="btn-save" class="btn ghost small" type="button">SAVE</button>
+          <button id="btn-ping" class="btn ghost small" type="button">TEST CONNECTION</button>
+          <span id="ping-result" class="hint"></span>
+        </div>
+      </details>
+    </section>
+
+    <p class="foot">Authorized assets only.</p>
+  </main>
+
+  <!-- nearby-phone card (opens when a green radar dot is tapped) -->
+  <div id="phone-sheet" class="sheet hidden">
+    <div class="sheet-card">
+      <div class="sheet-head">
+        <span id="ps-title" class="sheet-title">Phone</span>
+        <button id="ps-close" class="btn ghost small" type="button">CLOSE</button>
+      </div>
+      <div class="sheet-body">
+        <div class="kv"><span>Type</span><b id="ps-type">-</b></div>
+        <div class="kv"><span>Number</span><b id="ps-number">Unknown</b></div>
+        <div class="kv"><span>Network</span><b id="ps-network">-</b></div>
+        <div class="kv"><span>Name</span><b id="ps-name">-</b></div>
+        <div class="kv"><span>Services</span><b id="ps-services">-</b></div>
+      </div>
+      <button id="ps-hack" class="btn primary hack-btn" type="button">Hack now</button>
+      <p class="sheet-note">Real audit: reachability, services, name leaks, ADB exposure.</p>
+    </div>
+  </div>
+
+  <!-- front popup with the REAL exploit percentage -->
+  <div id="hack-modal" class="modal hidden">
+    <div class="modal-card">
+      <span id="hm-title" class="modal-title">HACK IN PROGRESS</span>
+      <span id="hm-pct" class="hack-pct">0%</span>
+      <div class="hack-bar"><div id="hm-fill" class="hack-fill"></div></div>
+      <span id="hm-level" class="modal-level">measuring real progress…</span>
+      <div id="hm-steps" class="modal-steps"></div>
+      <button id="hm-close" class="btn ghost small" type="button">CLOSE</button>
+    </div>
+  </div>
+
+  <script src="config.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>

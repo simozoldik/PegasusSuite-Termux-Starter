@@ -1,0 +1,108 @@
+name: Build Pegasus Suite APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK packages
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build web assets and run checks
+        env:
+          PEGASUS_API_BASE_URL: ${{ vars.PEGASUS_API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          npm run build
+          npm run test:web
+
+      - name: Prepare stable signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.PEGASUS_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.PEGASUS_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.PEGASUS_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.PEGASUS_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$KEYSTORE_BASE64" || -z "$STORE_PASSWORD" || -z "$KEY_ALIAS" || -z "$KEY_PASSWORD" ]]; then
+            echo "Missing signing secrets. Configure the four PEGASUS signing secrets."
+            exit 1
+          fi
+          KEYSTORE_PATH="$RUNNER_TEMP/pegasus-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          {
+            echo "PEGASUS_KEYSTORE_FILE=$KEYSTORE_PATH"
+            echo "PEGASUS_KEYSTORE_PASSWORD=$STORE_PASSWORD"
+            echo "PEGASUS_KEY_ALIAS=$KEY_ALIAS"
+            echo "PEGASUS_KEY_PASSWORD=$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Recreate Capacitor Android scaffold
+        env:
+          PEGASUS_VERSION_CODE: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          BACKUP="$RUNNER_TEMP/pegasus-gradle-template"
+          mkdir -p "$BACKUP/app"
+          cp android/build.gradle "$BACKUP/build.gradle"
+          cp android/variables.gradle "$BACKUP/variables.gradle"
+          cp android/gradle.properties "$BACKUP/gradle.properties"
+          cp android/app/build.gradle "$BACKUP/app/build.gradle"
+          cp android/app/proguard-rules.pro "$BACKUP/app/proguard-rules.pro"
+
+          rm -rf android
+          npx cap add android
+
+          cp "$BACKUP/build.gradle" android/build.gradle
+          cp "$BACKUP/variables.gradle" android/variables.gradle
+          cp "$BACKUP/gradle.properties" android/gradle.properties
+          cp "$BACKUP/app/build.gradle" android/app/build.gradle
+          cp "$BACKUP/app/proguard-rules.pro" android/app/proguard-rules.pro
+
+          node scripts/prepare-android-ci.mjs
+          npx cap sync android
+          chmod +x android/gradlew
+          cd android
+          ./gradlew --no-daemon --stacktrace assembleRelease
+
+      - name: Verify APK artifact
+        run: |
+          set -euo pipefail
+          test -s android/app/build/outputs/apk/release/Pegasus-Suite-release.apk
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pegasus-Suite-release-${{ github.run_number }}
+          path: android/app/build/outputs/apk/release/Pegasus-Suite-release.apk
+          if-no-files-found: error
+          retention-days: 14

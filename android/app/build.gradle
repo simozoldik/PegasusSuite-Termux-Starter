@@ -1,0 +1,97 @@
+apply plugin: 'com.android.application'
+
+def keystorePropsFile = rootProject.file('keystore.properties')
+def keystoreProps = new Properties()
+def hasPropsSigning = keystorePropsFile.exists()
+
+if (hasPropsSigning) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
+def hasEnvSigning = System.getenv('PEGASUS_KEYSTORE_FILE') != null
+def hasReleaseSigning = hasPropsSigning || hasEnvSigning
+
+def appIdOverride = project.findProperty('appId') ?: System.getenv('PEGASUS_APP_ID')
+def resolvedApplicationId = appIdOverride ?: 'com.pegasus.suite'
+
+android {
+    namespace "com.pegasus.suite"
+    compileSdk rootProject.ext.compileSdkVersion
+
+    defaultConfig {
+        applicationId resolvedApplicationId
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode (System.getenv('PEGASUS_VERSION_CODE') ?: '1').toInteger()
+        versionName "1.0.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        aaptOptions {
+            ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+
+    signingConfigs {
+        release {
+            if (hasPropsSigning) {
+                storeFile rootProject.file(keystoreProps['storeFile'] ?: 'keystore/release.keystore')
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            } else if (hasEnvSigning) {
+                storeFile file(System.getenv('PEGASUS_KEYSTORE_FILE'))
+                storePassword System.getenv('PEGASUS_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('PEGASUS_KEY_ALIAS')
+                keyPassword System.getenv('PEGASUS_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            if (output.outputFile != null && output.outputFile.name.endsWith('.apk')) {
+                outputFileName = "Pegasus-Suite-${variant.buildType.name}.apk"
+            }
+        }
+    }
+}
+
+repositories {
+    flatDir {
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.exists() && servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch (Exception e) {
+    logger.info("google-services.json not found; Google Services plugin not applied.")
+}
